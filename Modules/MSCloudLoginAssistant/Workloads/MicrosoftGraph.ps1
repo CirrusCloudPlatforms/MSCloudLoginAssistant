@@ -97,11 +97,20 @@ function Connect-MSCloudLoginMicrosoftGraph
     {
         try
         {
-            if ($Script:MSCloudLoginConnectionProfile.MicrosoftGraph.AuthenticationType -eq 'ServicePrincipalWithThumbprint')
+            if ($Script:MSCloudLoginConnectionProfile.MicrosoftGraph.AuthenticationType -eq 'ServicePrincipalWithCertificateBase64Encoded')
+            {
+                Add-MSCloudLoginAssistantEvent -Message 'Connecting to Microsoft Graph with CertificateBase64Encoded' -Source $source
+                $cert = ConvertTo-CertificateX509Object -CertificateBase64Encoded $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.CertificateBase64Encoded
+                Connect-MgGraph -ClientId $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.ApplicationId `
+                    -TenantId $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.TenantId `
+                    -Certificate $cert | Out-Null
+                Add-MSCloudLoginAssistantEvent -Message 'Successfully connected to the Microsoft Graph API using CertificateBase64Encoded' -Source $source
+            }
+            elseif ($Script:MSCloudLoginConnectionProfile.MicrosoftGraph.AuthenticationType -eq 'ServicePrincipalWithThumbprint')
             {
                 if ($null -ne $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints -and `
-                    $null -ne $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints.ConnectionUri -and `
-                    $null -ne $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints.AzureADAuthorizationEndpointUri)
+                        $null -ne $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints.ConnectionUri -and `
+                        $null -ne $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints.AzureADAuthorizationEndpointUri)
                 {
                     $accessToken = Get-MSCloudLoginAccessToken -ConnectionUri $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints.ConnectionUri `
                         -AzureADAuthorizationEndpointUri $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints.AzureADAuthorizationEndpointUri `

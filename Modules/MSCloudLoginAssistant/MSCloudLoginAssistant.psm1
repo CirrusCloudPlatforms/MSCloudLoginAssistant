@@ -26,7 +26,7 @@ function Connect-M365Tenant
     (
         [Parameter(Mandatory = $true)]
         [ValidateSet('AdminAPI', 'Azure', 'AzureDevOPS', 'ExchangeOnline', 'Fabric', 'Licensing', `
-                'SecurityComplianceCenter', 'PnP', 'PowerPlatforms', "PowerPlatformREST", `
+                'SecurityComplianceCenter', 'PnP', 'PowerPlatforms', 'PowerPlatformREST', `
                 'MicrosoftTeams', 'MicrosoftGraph', 'SharePointOnlineREST', 'Tasks', 'DefenderForEndpoint')]
         [System.String]
         $Workload,
@@ -67,6 +67,10 @@ function Connect-M365Tenant
         [Parameter()]
         [System.String]
         $CertificatePath,
+
+        [Parameter()]
+        [System.String]
+        $CertificateBase64Encoded,
 
         [Parameter()]
         [System.Boolean]
@@ -212,6 +216,7 @@ function Connect-M365Tenant
             $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.ApplicationSecret = $ApplicationSecret
             $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.TenantId = $TenantId
             $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.CertificateThumbprint = $CertificateThumbprint
+            $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.CertificateBase64Encoded = $CertificateBase64Encoded
             $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.AccessTokens = $AccessTokens
             $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Identity = $Identity
             $Script:MSCloudLoginConnectionProfile.MicrosoftGraph.Endpoints = $Endpoints
@@ -251,7 +256,7 @@ function Connect-M365Tenant
             {
                 $ForceRefresh = $false
                 if ($Script:MSCloudLoginConnectionProfile.PnP.ConnectionUrl -ne $Url -and `
-                    -not [System.String]::IsNullOrEmpty($url))
+                        -not [System.String]::IsNullOrEmpty($url))
                 {
                     $ForceRefresh = $true
                 }
@@ -630,7 +635,7 @@ function Compare-InputParametersForChange
         }
     }
     if ($workloadInternalName -eq 'PNP' -and $currentParameters.ContainsKey('Url') -and `
-        -not [System.String]::IsNullOrEmpty($currentParameters.Url))
+            -not [System.String]::IsNullOrEmpty($currentParameters.Url))
     {
         $globalParameters.Add('Url', $workloadProfile.ConnectionUrl)
     }
@@ -1074,6 +1079,37 @@ function Get-MSCloudLoginAccessToken
     }
 }
 
+function ConvertTo-CertificateX509Object
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $CertificateBase64Encoded
+    )
+
+    $source = 'ConvertTo-CertificateX509Object'
+    try
+    {
+        $certificateBase64String = [System.Convert]::FromBase64String($CertificateBase64Encoded)
+        $certificateCollection = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2Collection
+        $certificateCollection.Import($CertificateBase64String, $null, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+        $password = [System.Guid]::NewGuid().ToString()
+        $certificateExport = $CertificateCollection.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, $Password)
+        $securePassword = $password | ConvertTo-SecureString -AsPlainText -Force
+
+        $CertificateX509Object = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2($CertificateExport, $SecurePassword)
+        return $CertificateX509Object
+    }
+    catch
+    {
+        Add-MSCloudLoginAssistantEvent -Message $_ -Source $source -EntryType Error
+        throw $_
+    }
+
+}
+
+
 function Get-PowerPlatformTokenInfo
 {
     [CmdletBinding()]
@@ -1176,19 +1212,7 @@ function Get-CloudEnvironmentInfo
 
         [Parameter()]
         [System.String]
-        $ApplicationId,
-
-        [Parameter()]
-        [System.String]
         $TenantId,
-
-        [Parameter()]
-        [System.String]
-        $ApplicationSecret,
-
-        [Parameter()]
-        [System.String]
-        $CertificateThumbprint,
 
         [Parameter()]
         [switch]

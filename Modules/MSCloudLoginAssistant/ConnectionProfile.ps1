@@ -56,28 +56,28 @@ class MSCloudLoginConnectionProfile
         $this.CreatedTime = [System.DateTime]::Now.ToString()
 
         # Workloads Object Creation
-        $this.AdminAPI                 = New-Object AdminAPI
-        $this.Azure                    = New-Object Azure
-        $this.AzureDevOPS              = New-Object AzureDevOPS
-        $this.DefenderForEndpoint      = New-Object DefenderForEndpoint
-        $this.ExchangeOnline           = New-Object ExchangeOnline
-        $this.Fabric                   = New-Object Fabric
-        $this.Licensing                = New-Object Licensing
-        $this.MicrosoftGraph           = New-Object MicrosoftGraph
-        $this.PnP                      = New-Object PnP
-        $this.PowerPlatform            = New-Object PowerPlatform
-        $this.PowerPlatformREST        = New-Object PowerPlatformREST
+        $this.AdminAPI = New-Object AdminAPI
+        $this.Azure = New-Object Azure
+        $this.AzureDevOPS = New-Object AzureDevOPS
+        $this.DefenderForEndpoint = New-Object DefenderForEndpoint
+        $this.ExchangeOnline = New-Object ExchangeOnline
+        $this.Fabric = New-Object Fabric
+        $this.Licensing = New-Object Licensing
+        $this.MicrosoftGraph = New-Object MicrosoftGraph
+        $this.PnP = New-Object PnP
+        $this.PowerPlatform = New-Object PowerPlatform
+        $this.PowerPlatformREST = New-Object PowerPlatformREST
         $this.SecurityComplianceCenter = New-Object SecurityComplianceCenter
-        $this.SharePointOnlineREST     = New-Object SharePointOnlineREST
-        $this.Tasks                    = New-Object Tasks
-        $this.Teams                    = New-Object Teams
+        $this.SharePointOnlineREST = New-Object SharePointOnlineREST
+        $this.Tasks = New-Object Tasks
+        $this.Teams = New-Object Teams
     }
 }
 
 class Workload : ICloneable
 {
     [string]
-    [ValidateSet('Credentials', 'CredentialsWithApplicationId', 'CredentialsWithTenantId', 'ServicePrincipalWithSecret', 'ServicePrincipalWithThumbprint', 'ServicePrincipalWithPath', 'Interactive', 'Identity', 'AccessTokens')]
+    [ValidateSet('Credentials', 'CredentialsWithApplicationId', 'CredentialsWithTenantId', 'ServicePrincipalWithSecret', 'ServicePrincipalWithThumbprint', 'ServicePrincipalWithPath', 'Interactive', 'Identity', 'AccessTokens', 'ServicePrincipalWithCertificateBase64Encoded')]
     $AuthenticationType
 
     [boolean]
@@ -117,6 +117,9 @@ class Workload : ICloneable
     [string]
     $CertificateThumbprint
 
+    [string]
+    $CertificateBase64Encoded
+
     [String[]]
     $AccessTokens
 
@@ -133,8 +136,8 @@ class Workload : ICloneable
 
     Setup()
     {
-        $source = "Workload"
-        Add-MSCloudLoginAssistantEvent -Message "Starting the Setup() logic" -Source $source
+        $source = 'Workload'
+        Add-MSCloudLoginAssistantEvent -Message 'Starting the Setup() logic' -Source $source
         Add-MSCloudLoginAssistantEvent -Message "`$this.EnvironmentName = '$($this.EnvironmentName)'" -Source $source
         Add-MSCloudLoginAssistantEvent -Message "`$Script:MSCloudLoginTriedGetEnvironment = '$($Script:MSCloudLoginTriedGetEnvironment)'" -Source $source
         # Determine the environment name based on email
@@ -145,14 +148,9 @@ class Workload : ICloneable
             {
                 $Script:CloudEnvironmentInfo = Get-CloudEnvironmentInfo -Credentials $this.Credentials
             }
-            elseif ($this.ApplicationID -and $this.CertificateThumbprint)
+            elseif ($this.ApplicationID -and (($this.CertificateThumbprint) -or ($this.CertificateBase64Encoded) -or ($this.ApplicationSecret)))
             {
-                Add-MSCloudLoginAssistantEvent -Message "Trying to retrieve the Cloud Environment using Certificate Thumbprint." -Source $source
-                $Script:CloudEnvironmentInfo = Get-CloudEnvironmentInfo -ApplicationId $this.ApplicationId -TenantId $this.TenantId -CertificateThumbprint $this.CertificateThumbprint
-            }
-            elseif ($this.ApplicationID -and $this.ApplicationSecret)
-            {
-                $Script:CloudEnvironmentInfo = Get-CloudEnvironmentInfo -ApplicationId $this.ApplicationId -TenantId $this.TenantId -ApplicationSecret $this.ApplicationSecret
+                $Script:CloudEnvironmentInfo = Get-CloudEnvironmentInfo -TenantId $this.TenantId
             }
             elseif ($this.Identity.IsPresent)
             {
@@ -226,6 +224,10 @@ class Workload : ICloneable
         {
             $this.AuthenticationType = 'ServicePrincipalWithPath'
         }
+        elseif ($this.ApplicationId -and $this.TenantId -and $this.CertificateBase64Encoded)
+        {
+            $this.AuthenticationType = 'ServicePrincipalWithCertificateBase64Encoded'
+        }
         elseif ($this.Credentials -and $this.ApplicationId)
         {
             $this.AuthenticationType = 'CredentialsWithApplicationId'
@@ -277,18 +279,18 @@ class AdminAPI:Workload
         {
             'AzureDOD'
             {
-                $this.Scope            = "6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.Scope = '6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             'AzureUSGovernment'
             {
-                $this.Scope            = "6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.Scope = '6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             default
             {
-                $this.Scope            = "6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
+                $this.Scope = '6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
             }
         }
 
@@ -341,21 +343,21 @@ class AzureDevOPS:Workload
         {
             'AzureDOD'
             {
-                $this.HostUrl          = "https://dev.azure.us"
-                $this.Scope            = "499b84ac-1321-427f-aa17-267ca6975798/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.HostUrl = 'https://dev.azure.us'
+                $this.Scope = '499b84ac-1321-427f-aa17-267ca6975798/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             'AzureUSGovernment'
             {
-                $this.HostUrl          = "https://dev.azure.com"
-                $this.Scope            = "499b84ac-1321-427f-aa17-267ca6975798/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.HostUrl = 'https://dev.azure.com'
+                $this.Scope = '499b84ac-1321-427f-aa17-267ca6975798/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             default
             {
-                $this.HostUrl          = "https://dev.azure.com"
-                $this.Scope            = "499b84ac-1321-427f-aa17-267ca6975798/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
+                $this.HostUrl = 'https://dev.azure.com'
+                $this.Scope = '499b84ac-1321-427f-aa17-267ca6975798/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
             }
         }
 
@@ -501,21 +503,21 @@ class Fabric:Workload
         {
             'AzureDOD'
             {
-                $this.HostUrl          = "https://api.fabric.microsoft.us"
-                $this.Scope            = "https://api.fabric.microsoft.us/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.HostUrl = 'https://api.fabric.microsoft.us'
+                $this.Scope = 'https://api.fabric.microsoft.us/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             'AzureUSGovernment'
             {
-                $this.HostUrl          = "https://api.fabric.microsoft.us"
-                $this.Scope            = "https://api.fabric.microsoft.us/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.HostUrl = 'https://api.fabric.microsoft.us'
+                $this.Scope = 'https://api.fabric.microsoft.us/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             default
             {
-                $this.HostUrl          = "https://api.fabric.microsoft.com"
-                $this.Scope            = "https://api.fabric.microsoft.com/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
+                $this.HostUrl = 'https://api.fabric.microsoft.com'
+                $this.Scope = 'https://api.fabric.microsoft.com/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
             }
         }
 
@@ -548,21 +550,21 @@ class Licensing:Workload
         {
             'AzureDOD'
             {
-                $this.HostUrl          = "https://licensing.m365.microsoft.com"
-                $this.Scope            = "aeb86249-8ea3-49e2-900b-54cc8e308f85/.default"
-                $this.AuthorizationUrl = "hhttps://login.microsoftonline.com"
+                $this.HostUrl = 'https://licensing.m365.microsoft.com'
+                $this.Scope = 'aeb86249-8ea3-49e2-900b-54cc8e308f85/.default'
+                $this.AuthorizationUrl = 'hhttps://login.microsoftonline.com'
             }
             'AzureUSGovernment'
             {
-                $this.HostUrl          = "https://licensing.m365.microsoft.com"
-                $this.Scope            = "aeb86249-8ea3-49e2-900b-54cc8e308f85/.default"
-                $this.AuthorizationUrl = "hhttps://login.microsoftonline.com"
+                $this.HostUrl = 'https://licensing.m365.microsoft.com'
+                $this.Scope = 'aeb86249-8ea3-49e2-900b-54cc8e308f85/.default'
+                $this.AuthorizationUrl = 'hhttps://login.microsoftonline.com'
             }
             default
             {
-                $this.HostUrl          = "https://licensing.m365.microsoft.com"
-                $this.Scope            = "aeb86249-8ea3-49e2-900b-54cc8e308f85/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
+                $this.HostUrl = 'https://licensing.m365.microsoft.com'
+                $this.Scope = 'aeb86249-8ea3-49e2-900b-54cc8e308f85/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
             }
         }
 
@@ -794,28 +796,28 @@ class PowerPlatformREST:Workload
             #>
             'AzureDOD'
             {
-                $this.Scope            = "6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
-                $this.Audience         = "https://service.apps.appsplatform.us/"
-                $this.ClientId         = "1950a258-227b-4e31-a9cf-717495945fc2"
-                $this.BapEndpoint      = "api.bap.appsplatform.us"
+                $this.Scope = '6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
+                $this.Audience = 'https://service.apps.appsplatform.us/'
+                $this.ClientId = '1950a258-227b-4e31-a9cf-717495945fc2'
+                $this.BapEndpoint = 'api.bap.appsplatform.us'
 
             }
             'AzureUSGovernment'
             {
-                $this.Scope            = "6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
-                $this.Audience         = "https://gov.service.powerapps.us/"
-                $this.ClientId         = "1950a258-227b-4e31-a9cf-717495945fc2"
-                $this.BapEndpoint      = "gov.api.bap.microsoft.us"
+                $this.Scope = '6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
+                $this.Audience = 'https://gov.service.powerapps.us/'
+                $this.ClientId = '1950a258-227b-4e31-a9cf-717495945fc2'
+                $this.BapEndpoint = 'gov.api.bap.microsoft.us'
             }
             default
             {
-                $this.Scope            = "6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
-                $this.Audience         = "https://service.powerapps.com/"
-                $this.ClientId         = "1950a258-227b-4e31-a9cf-717495945fc2"
-                $this.BapEndpoint      = "api.bap.microsoft.com"
+                $this.Scope = '6a8b4b39-c021-437c-b060-5a14a3fd65f3/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
+                $this.Audience = 'https://service.powerapps.com/'
+                $this.ClientId = '1950a258-227b-4e31-a9cf-717495945fc2'
+                $this.BapEndpoint = 'api.bap.microsoft.com'
             }
         }
 
@@ -909,7 +911,7 @@ class SharePointOnlineREST:Workload
 
         # Retrieve the SPO Admin URL
         if ($Script:MSCloudLoginConnectionProfile.SharePointOnlineREST.AuthenticationType -eq 'Credentials' -and `
-            -not $Script:MSCloudLoginConnectionProfile.SharePointOnlineREST.AdminUrl)
+                -not $Script:MSCloudLoginConnectionProfile.SharePointOnlineREST.AdminUrl)
         {
             $this.AdminUrl = Get-SPOAdminUrl -Credential $Script:MSCloudLoginConnectionProfile.SharePointOnlineREST.Credentials
             if ([String]::IsNullOrEmpty($this.AdminUrl) -eq $false)
@@ -953,21 +955,21 @@ class SharePointOnlineREST:Workload
         {
             'AzureDOD'
             {
-                $this.HostUrl          = $this.AdminUrl
-                $this.Scope            = "$($this.AdminUrl)/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.HostUrl = $this.AdminUrl
+                $this.Scope = "$($this.AdminUrl)/.default"
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             'AzureUSGovernment'
             {
-                $this.HostUrl          = $this.AdminUrl
-                $this.Scope            = "$($this.AdminUrl)/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
+                $this.HostUrl = $this.AdminUrl
+                $this.Scope = "$($this.AdminUrl)/.default"
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
             }
             default
             {
-                $this.HostUrl          = $this.AdminUrl
-                $this.Scope            = "$($this.AdminUrl)/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
+                $this.HostUrl = $this.AdminUrl
+                $this.Scope = "$($this.AdminUrl)/.default"
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
             }
         }
 
@@ -1003,24 +1005,24 @@ class Tasks:Workload
         {
             'AzureDOD'
             {
-                $this.HostUrl          = "https://tasks.office.us"
-                $this.Scope            = "https://tasks.office.us/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
-                $this.ResourceUrl      = "https://tasks.osi.apps.mil"
+                $this.HostUrl = 'https://tasks.office.us'
+                $this.Scope = 'https://tasks.office.us/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
+                $this.ResourceUrl = 'https://tasks.osi.apps.mil'
             }
             'AzureUSGovernment'
             {
-                $this.HostUrl          = "https://tasks.office.us"
-                $this.Scope            = "https://tasks.office365.us/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.us"
-                $this.ResourceUrl      = "https://tasks.office365.us"
+                $this.HostUrl = 'https://tasks.office.us'
+                $this.Scope = 'https://tasks.office365.us/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.us'
+                $this.ResourceUrl = 'https://tasks.office365.us'
             }
             default
             {
-                $this.HostUrl          = "https://tasks.office.com"
-                $this.Scope            = "https://tasks.office.com/.default"
-                $this.AuthorizationUrl = "https://login.microsoftonline.com"
-                $this.ResourceUrl      = "https://tasks.office.com"
+                $this.HostUrl = 'https://tasks.office.com'
+                $this.Scope = 'https://tasks.office.com/.default'
+                $this.AuthorizationUrl = 'https://login.microsoftonline.com'
+                $this.ResourceUrl = 'https://tasks.office.com'
             }
         }
 
